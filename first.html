@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>All-in-One Utility App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    body {
+      background-color: #f5f7fa;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+
+    h2 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+
+    video, canvas, img {
+      width: 100%;
+      max-width: 300px;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      margin: 5px 0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .section {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    }
+
+    .image-block {
+      margin-top: 10px;
+    }
+
+    #photoContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .image-block a {
+      text-decoration: none;
+      color: #2980b9;
+      font-weight: bold;
+      display: inline-block;
+      margin-top: 5px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    a {
+      color: #3498db;
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      video, canvas, img {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="section">
+    <h2>📷 Camera Preview</h2>
+    <video id="video" autoplay></video><br>
+    <button onclick="capturePhoto()">📸 Capture Photo</button>
+  </div>
+
+  <div class="section">
+    <h2>🖼️ Captured Photos</h2>
+    <div id="photoContainer"></div>
+  </div>
+
+  <div class="section">
+    <h2>🎥 Video Recording</h2>
+    <button onclick="startRecording()">▶️ Start Recording</button>
+    <button onclick="stopRecording()">⏹️ Stop & Save Video</button><br><br>
+    <video id="recordedVideo" controls></video><br>
+    <a id="downloadVideoLink" style="display:none;" download="recorded_video.webm">⬇️ Download Video</a>
+  </div>
+
+  <div class="section">
+    <h2>📍 Your Current Location</h2>
+    <button onclick="getLocation()">📍 Show My Location</button>
+    <p id="locationText"></p>
+    <a id="mapLink" href="#" target="_blank" style="display:none;">🗺️ View on Map</a><br><br>
+    <button onclick="viewNearbyStores()">🛒 View Nearby Grocery Stores</button>
+    <a id="groceryLink" href="#" target="_blank" style="display:none;">🛍️ Open Grocery Stores Map</a>
+  </div>
+
+  <div class="section">
+    <h2>📧 Send an Email</h2>
+    <form onsubmit="sendEmail(); return false;">
+      <label for="sender_email">Your Email:</label>
+      <input type="email" id="sender_email" required>
+
+      <label for="receiver_email">Recipient's Email:</label>
+      <input type="email" id="receiver_email" required>
+
+      <label for="message">Message:</label>
+      <textarea id="message" rows="5" required></textarea>
+
+      <button type="submit">✉️ Send Email</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>📲 Send WhatsApp Message (India)</h2>
+    <label for="phone">Indian Mobile Number:</label>
+    <input type="tel" id="phone" placeholder="e.g. 9876543210">
+
+    <label for="whatsapp_message">Your Message:</label>
+    <textarea id="whatsapp_message" rows="4" placeholder="Type your message..."></textarea>
+
+    <button onclick="sendWhatsApp()">📤 Send via WhatsApp</button>
+  </div>
+
+  <!-- EmailJS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js">
+// Twilio SMS
+function sendSMS() {
+  const number = document.getElementById("sms_number").value;
+  const text = document.getElementById("sms_text").value;
+  fetch('/send_sms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: number, message: text })
+  })
+  .then(res => res.json())
+  .then(data => alert(data.status))
+  .catch(err => alert("Failed to send SMS: " + err));
+}
+
+// 🛍️ Product Tracker
+const products = [
+  { id: "p1", name: "iPhone 14", image: "https://via.placeholder.com/300x200?text=iPhone" },
+  { id: "p2", name: "Galaxy S22", image: "https://via.placeholder.com/300x200?text=Samsung" },
+  { id: "p3", name: "Pixel 8", image: "https://via.placeholder.com/300x200?text=Pixel" }
+];
+const viewCounts = {};
+const viewTimers = {};
+
+function showProducts() {
+  const productArea = document.getElementById("productArea");
+  productArea.innerHTML = "";
+  products.forEach(product => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <img src="${product.image}" width="300"><br>
+      <strong>${product.name}</strong><br>
+      <button onclick="skipProduct('${product.id}')">Skip</button>
+    `;
+    div.onmouseenter = () => startTimer(product.id);
+    div.onmouseleave = () => stopTimer(product.id);
+    productArea.appendChild(div);
+  });
+}
+
+function startTimer(id) {
+  viewTimers[id] = Date.now();
+}
+
+function stopTimer(id) {
+  const start = viewTimers[id];
+  if (start) {
+    const seconds = (Date.now() - start) / 1000;
+    if (seconds > 2) {
+      viewCounts[id] = (viewCounts[id] || 0) + 1;
+      updateRecommendations();
+    }
+  }
+}
+
+function skipProduct(id) {
+  viewTimers[id] = 0;
+  alert(`You skipped ${id}`);
+}
+
+function updateRecommendations() {
+  const sorted = Object.entries(viewCounts).sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 2).map(([id]) => {
+    const p = products.find(p => p.id === id);
+    return `<p>👉 ${p.name}</p>`;
+  }).join("");
+  document.getElementById("recommendationArea").innerHTML = top || "<p>No views yet</p>";
+}
+
+document.addEventListener("DOMContentLoaded", showProducts);
+
+</script>
+
+  <script>
+    const video = document.getElementById('video');
+    const recordedVideo = document.getElementById('recordedVideo');
+    const downloadVideoLink = document.getElementById('downloadVideoLink');
+    const photoContainer = document.getElementById('photoContainer');
+    const locationText = document.getElementById('locationText');
+    const mapLink = document.getElementById('mapLink');
+    const groceryLink = document.getElementById('groceryLink');
+
+    let mediaRecorder;
+    let recordedChunks = [];
+    let currentLat = null;
+    let currentLon = null;
+
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        video.srcObject = stream;
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) recordedChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          recordedVideo.src = url;
+          downloadVideoLink.href = url;
+          downloadVideoLink.style.display = 'inline-block';
+        };
+      })
+      .catch(err => {
+        console.error("Camera access error:", err);
+        alert("Please allow camera/mic access.");
+      });
+
+    function capturePhoto() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 300;
+      canvas.height = 225;
+      const context = canvas.getContext('2d');
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageUrl = canvas.toDataURL("image/png");
+
+      const imageBlock = document.createElement('div');
+      imageBlock.className = 'image-block';
+
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.width = 300;
+      img.height = 225;
+
+      const downloadLink = document.createElement('a');
+      downloadLink.href = imageUrl;
+      downloadLink.download = `captured_${Date.now()}.png`;
+      downloadLink.textContent = "⬇️ Download this image";
+
+      imageBlock.appendChild(img);
+      imageBlock.appendChild(downloadLink);
+      photoContainer.appendChild(imageBlock);
+    }
+
+    function startRecording() {
+      recordedChunks = [];
+      mediaRecorder.start();
+      console.log("Recording started...");
+    }
+
+    function stopRecording() {
+      mediaRecorder.stop();
+      console.log("Recording stopped.");
+    }
+
+    function getLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          currentLat = position.coords.latitude;
+          currentLon = position.coords.longitude;
+          locationText.textContent = `Latitude: ${currentLat}, Longitude: ${currentLon}`;
+          mapLink.href = `https://www.google.com/maps?q=${currentLat},${currentLon}`;
+          mapLink.style.display = 'inline-block';
+        }, () => {
+          locationText.textContent = "Unable to retrieve location.";
+        });
+      } else {
+        locationText.textContent = "Geolocation is not supported by this browser.";
+      }
+    }
+
+    function viewNearbyStores() {
+      if (currentLat && currentLon) {
+        groceryLink.href = `https://www.google.com/maps/search/grocery+stores/@${currentLat},${currentLon},15z`;
+        groceryLink.style.display = 'inline-block';
+      } else {
+        alert("Please click 'Show My Location' first.");
+      }
+    }
+
+    (function () {
+      emailjs.init("m4gEoizTa3mlw9peT"); // Your Public Key
+    })();
+
+    function sendEmail() {
+      const senderEmail = document.getElementById("sender_email").value;
+      const receiverEmail = document.getElementById("receiver_email").value;
+      const message = document.getElementById("message").value;
+
+      emailjs.send("service_08wuxti", "template_lzj1ykm", {
+        sender_email: senderEmail,
+        receiver_email: receiverEmail,
+        message: message,
+      }).then(function(response) {
+        alert("✅ Email sent successfully!");
+      }, function(error) {
+        alert("❌ Failed to send email.");
+        console.error("FAILED", error);
+      });
+    }
+
+    function sendWhatsApp() {
+      const localNumber = document.getElementById('phone').value.trim();
+      const message = document.getElementById('whatsapp_message').value.trim();
+
+      if (!localNumber.match(/^\d{10}$/)) {
+        alert('Please enter a valid 10-digit Indian mobile number.');
+        return;
+      }
+
+      if (!message) {
+        alert('Please enter a message.');
+        return;
+      }
+
+      const phone = `91${localNumber}`;
+      const encodedMessage = encodeURIComponent(message);
+      const url = `https://wa.me/${phone}?text=${encodedMessage}`;
+      window.open(url, '_blank');
+    }
+  
+// Twilio SMS
+function sendSMS() {
+  const number = document.getElementById("sms_number").value;
+  const text = document.getElementById("sms_text").value;
+  fetch('/send_sms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: number, message: text })
+  })
+  .then(res => res.json())
+  .then(data => alert(data.status))
+  .catch(err => alert("Failed to send SMS: " + err));
+}
+
+// 🛍️ Product Tracker
+const products = [
+  { id: "p1", name: "iPhone 14", image: "https://via.placeholder.com/300x200?text=iPhone" },
+  { id: "p2", name: "Galaxy S22", image: "https://via.placeholder.com/300x200?text=Samsung" },
+  { id: "p3", name: "Pixel 8", image: "https://via.placeholder.com/300x200?text=Pixel" }
+];
+const viewCounts = {};
+const viewTimers = {};
+
+function showProducts() {
+  const productArea = document.getElementById("productArea");
+  productArea.innerHTML = "";
+  products.forEach(product => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <img src="${product.image}" width="300"><br>
+      <strong>${product.name}</strong><br>
+      <button onclick="skipProduct('${product.id}')">Skip</button>
+    `;
+    div.onmouseenter = () => startTimer(product.id);
+    div.onmouseleave = () => stopTimer(product.id);
+    productArea.appendChild(div);
+  });
+}
+
+function startTimer(id) {
+  viewTimers[id] = Date.now();
+}
+
+function stopTimer(id) {
+  const start = viewTimers[id];
+  if (start) {
+    const seconds = (Date.now() - start) / 1000;
+    if (seconds > 2) {
+      viewCounts[id] = (viewCounts[id] || 0) + 1;
+      updateRecommendations();
+    }
+  }
+}
+
+function skipProduct(id) {
+  viewTimers[id] = 0;
+  alert(`You skipped ${id}`);
+}
+
+function updateRecommendations() {
+  const sorted = Object.entries(viewCounts).sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 2).map(([id]) => {
+    const p = products.find(p => p.id === id);
+    return `<p>👉 ${p.name}</p>`;
+  }).join("");
+  document.getElementById("recommendationArea").innerHTML = top || "<p>No views yet</p>";
+}
+
+document.addEventListener("DOMContentLoaded", showProducts);
+
+</script>
+
+
+<!-- 📩 Send SMS (Twilio) -->
+<div class="section">
+  <h2>📩 Send SMS (via Twilio)</h2>
+  <label for="sms_number">Mobile Number (with country code):</label>
+  <input type="tel" id="sms_number" placeholder="+919509040033" required>
+  <label for="sms_text">Message:</label>
+  <textarea id="sms_text" rows="4" placeholder="Type your SMS message..."></textarea>
+  <button onclick="sendSMS()">📤 Send SMS</button>
+</div>
+
+<!-- 🛍️ Product Viewer -->
+<div class="section">
+  <h2>🛍️ Products You Might Like</h2>
+  <div id="productArea"></div>
+  <h4>🔥 Recommended for You</h4>
+  <div id="recommendationArea"></div>
+</div>
+
+</body>
+</html>
